@@ -1,0 +1,91 @@
+name: Homebrew
+
+on:
+  workflow_run:
+    workflows: ["Publish"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  FORMULA_NAME: kutelog
+  TAP_OWNER: ${{ github.repository_owner }}
+  TAP_NAME: homebrew-tap
+
+jobs:
+  update-formula:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TAP_OWNER }}/${{ env.TAP_NAME }}
+          path: tap
+          token: ${{ secrets.TAP_TOKEN }}
+
+      - name: Get latest release
+        id: get_release
+        run: |
+          RELEASE_TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq .tag_name)
+          echo "VERSION=$RELEASE_TAG" >> $GITHUB_ENV
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download release assets
+        run: |
+          mkdir -p tmp
+          gh release download ${{ env.VERSION }} -D tmp --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Calculate SHA256
+        id: sha256
+        run: |
+          echo "DARWIN_ARM64=$(sha256sum tmp/${{ env.FORMULA_NAME }}-darwin-arm64 | cut -d ' ' -f 1)" >> $GITHUB_ENV
+          echo "DARWIN_AMD64=$(sha256sum tmp/${{ env.FORMULA_NAME }}-darwin-amd64 | cut -d ' ' -f 1)" >> $GITHUB_ENV
+          echo "LINUX_ARM64=$(sha256sum tmp/${{ env.FORMULA_NAME }}-linux-arm64 | cut -d ' ' -f 1)" >> $GITHUB_ENV
+          echo "LINUX_AMD64=$(sha256sum tmp/${{ env.FORMULA_NAME }}-linux-amd64 | cut -d ' ' -f 1)" >> $GITHUB_ENV
+
+      - name: Update Formula
+        run: |
+          mkdir -p tap/Formula
+          go run homebrew/generate.go > tap/Formula/${{ env.FORMULA_NAME }}.rb
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          path: tap
+          token: ${{ secrets.TAP_TOKEN }}
+          commit-message: "brew(${{ env.FORMULA_NAME }}): update formula to ${{ env.VERSION }}"
+          title: "brew(${{ env.FORMULA_NAME }}): update formula to ${{ env.VERSION }}"
+          body: |
+            Update Homebrew formula for [${{ env.FORMULA_NAME }}](https://github.com/${{ github.repository }})
+
+            ## Changes
+            - Version: [${{ env.VERSION }}](https://github.com/${{ github.repository }}/releases/tag/${{ env.VERSION }})
+            - Repository: ${{ github.repository }}
+
+            ## SHA256 Checksums
+            - Darwin ARM64: `${{ env.DARWIN_ARM64 }}`
+            - Darwin AMD64: `${{ env.DARWIN_AMD64 }}`
+            - Linux ARM64: `${{ env.LINUX_ARM64 }}`
+            - Linux AMD64: `${{ env.LINUX_AMD64 }}`
+
+            ## Installation
+            ```bash
+            brew tap ${{ env.TAP_OWNER }}/${{ env.TAP_NAME }}
+            brew install ${{ env.FORMULA_NAME }}
+            ```
+
+            ## Links
+            - [Release Notes](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.VERSION }})
+          branch: ${{ env.FORMULA_NAME }}/update-brew-formula
+          delete-branch: true
+          signoff: true

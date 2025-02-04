@@ -1,0 +1,34 @@
+name: Publish
+
+on:
+  push:
+    tags:
+      - v*
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: nix develop --command bash -e {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/flakehub-cache-action@main
+      - run: "true" # warm up the nix store
+      - run: cd pkg/emitters/websocket/static && bun install
+      - run: cd pkg/emitters/websocket/static && bun run build
+      - id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+      - run: just version="${{ env.VERSION }}" build-all
+      - run: |
+          cd dist
+          sha256sum * > checksums.txt
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
