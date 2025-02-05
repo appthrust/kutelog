@@ -1,5 +1,12 @@
 # 🌸 AppThrust Kutelog
 
+[![GitHub Release](https://img.shields.io/github/v/release/appthrust/kutelog)](https://github.com/appthrust/kutelog/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/appthrust/kutelog)](https://goreportcard.com/report/github.com/appthrust/kutelog)
+[![GitHub License](https://img.shields.io/github/license/appthrust/kutelog)](https://github.com/appthrust/kutelog/blob/main/LICENSE)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/appthrust/kutelog)](https://github.com/appthrust/kutelog)
+[![Build Status](https://github.com/appthrust/kutelog/actions/workflows/ci.yml/badge.svg
+)](https://github.com/appthrust/kutelog/actions)
+
 Kutelog is a development tool that leverages your browser's Console to make structured logs from Kubebuilder controllers easy to read in real-time. By utilizing the Console's powerful features, it helps developers see and analyze what their controllers are doing while they work on them.
 
 Works with Chrome, Firefox, Safari, and Edge.
