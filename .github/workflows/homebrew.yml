@@ -1,3 +1,41 @@
+# Required secrets and environment variables for this workflow:
+#
+# GitHub App Setup:
+# - Name: {org}-homebrew-tap
+#   Recommended to create a dedicated app for homebrew-tap repository management:
+#   - Security: Follows the principle of least privilege
+#   - Clarity: Purpose is clear from the name
+#   - Manageability: Focused on a single responsibility
+# - Installation scope: Organization
+# - Repository access: Only select repositories (homebrew-tap)
+# - Repository permissions:
+#   - Contents: Read and write (Required for PR creation)
+#   - Pull requests: Write (Required for PR creation and management)
+#
+# Secrets:
+# - HOMEBREW_TAP_APP_PRIVATE_KEY:
+#   GitHub App's private key in PEM format
+#   1. Download from: GitHub App settings > Private keys > Make a new private key
+#   2. Set as secret:
+#   $ gh secret set HOMEBREW_TAP_APP_PRIVATE_KEY < private-key.pem
+#   Example:
+#   -----BEGIN RSA PRIVATE KEY-----
+#   MIIEpAIBAAKCAQEA1c7+9z5Pad7OejecsQ0bu...
+#   -----END RSA PRIVATE KEY-----
+#
+# Environment variables:
+# - HOMEBREW_TAP_APP_ID:
+#   GitHub App's ID
+#   1. Get the value:
+#   $ gh api /orgs/<org>/installations | jq '.installations[] | select(.app_slug == "<app-name>") | .app_id'
+#   Example:
+#   $ gh api /orgs/my-org/installations | jq '.installations[] | select(.app_slug == "my-github-app") | .app_id'
+#   1234567
+#   2. Set as variable:
+#   $ gh variable set HOMEBREW_TAP_APP_ID --body "<app-id>"
+#   Example:
+#   $ gh variable set HOMEBREW_TAP_APP_ID --body "1234567"
+
 name: Homebrew
 
 on:
@@ -6,30 +44,38 @@ on:
     types:
       - completed
 
-permissions:
-  contents: write
-  pull-requests: write
-
 env:
   FORMULA_NAME: kutelog
-  TAP_OWNER: ${{ github.repository_owner }}
-  TAP_NAME: homebrew-tap
+  TAP_NAME: ${{ github.repository_owner }}/tap
 
 jobs:
   update-formula:
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
+      - name: Generate GitHub App Token
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.HOMEBREW_TAP_APP_ID }}
+          private-key: ${{ secrets.HOMEBREW_TAP_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: homebrew-tap
+      - name: Get GitHub App User ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+      - id: committer
+        run: echo "string=${{ steps.app-token.outputs.app-slug }}[bot] <${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com>"  >> "$GITHUB_OUTPUT"
       - name: Checkout main repo
         uses: actions/checkout@v4
-
       - name: Checkout tap repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ env.TAP_OWNER }}/${{ env.TAP_NAME }}
+          repository: ${{ github.repository_owner }}/homebrew-tap
           path: tap
-          token: ${{ secrets.TAP_TOKEN }}
-
+          token: ${{ steps.app-token.outputs.token }}
+          # Make sure the value of GITHUB_TOKEN will not be persisted in repo's config
+          persist-credentials: false
       - name: Get latest release
         id: get_release
         run: |
@@ -37,14 +83,12 @@ jobs:
           echo "VERSION=$RELEASE_TAG" >> $GITHUB_ENV
         env:
           GH_TOKEN: ${{ github.token }}
-
       - name: Download release assets
         run: |
           mkdir -p tmp
           gh release download ${{ env.VERSION }} -D tmp --clobber
         env:
           GH_TOKEN: ${{ github.token }}
-
       - name: Calculate SHA256
         id: sha256
         run: |
@@ -52,18 +96,18 @@ jobs:
           echo "DARWIN_AMD64=$(sha256sum tmp/${{ env.FORMULA_NAME }}-darwin-amd64 | cut -d ' ' -f 1)" >> $GITHUB_ENV
           echo "LINUX_ARM64=$(sha256sum tmp/${{ env.FORMULA_NAME }}-linux-arm64 | cut -d ' ' -f 1)" >> $GITHUB_ENV
           echo "LINUX_AMD64=$(sha256sum tmp/${{ env.FORMULA_NAME }}-linux-amd64 | cut -d ' ' -f 1)" >> $GITHUB_ENV
-
       - name: Update Formula
         run: |
           mkdir -p tap/Formula
           go run homebrew/generate.go > tap/Formula/${{ env.FORMULA_NAME }}.rb
-
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5
         with:
           path: tap
-          token: ${{ secrets.TAP_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           commit-message: "brew(${{ env.FORMULA_NAME }}): update formula to ${{ env.VERSION }}"
+          author: ${{ steps.committer.outputs.string }}
+          committer: ${{ steps.committer.outputs.string }}
           title: "brew(${{ env.FORMULA_NAME }}): update formula to ${{ env.VERSION }}"
           body: |
             Update Homebrew formula for [${{ env.FORMULA_NAME }}](https://github.com/${{ github.repository }})
@@ -80,7 +124,7 @@ jobs:
 
             ## Installation
             ```bash
-            brew tap ${{ env.TAP_OWNER }}/${{ env.TAP_NAME }}
+            brew tap ${{ github.repository_owner }}/tap
             brew install ${{ env.FORMULA_NAME }}
             ```
 
