@@ -3,8 +3,8 @@
 ## Development Environment Setup
 
 ### Prerequisites
-- [Nix](https://nixos.org) package manager
-- Nix flakes enabled
+- [Devbox](https://www.jetpack.io/devbox/) - Development environment manager
+- [direnv](https://direnv.net/) (recommended for automatic environment activation)
 
 ### Setting Up Development Environment
 
@@ -16,12 +16,18 @@
 
 2. Enter development shell:
    ```bash
-   nix develop
+   devbox shell
    ```
+   Or if you have direnv installed and enabled:
+   ```bash
+   direnv allow
+   ```
+   
    This will make the following tools available:
    - Go
    - Bun
    - Biome
+   - just
    - kind
    - kubectl
 
