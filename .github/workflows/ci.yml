@@ -13,17 +13,12 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: nix develop --command bash -e {0}
     steps:
       - uses: actions/checkout@v4
-      - uses: DeterminateSystems/nix-installer-action@main
-      - uses: DeterminateSystems/flakehub-cache-action@main
-      - run: "true" # warm up the nix store
-      - run: biome ci
-      - run: cd pkg/emitters/websocket/static && bun install
-      - run: cd pkg/emitters/websocket/static && bun run build
-      - run: test -z "$(gofmt -l . | tee /dev/stderr)"
-      - run: go vet ./...
-      - run: go test -v ./...
+      - uses: jetify-com/devbox-install-action@v0.12.0
+      - run: devbox run -- biome ci
+      - run: devbox run -- bash -c 'cd pkg/emitters/websocket/static && bun install'
+      - run: devbox run -- bash -c 'cd pkg/emitters/websocket/static && bun run build'
+      - run: devbox run -- bash -c 'test -z "$(gofmt -l . | tee /dev/stderr)"'
+      - run: devbox run -- go vet ./...
+      - run: devbox run -- go test -v ./...
