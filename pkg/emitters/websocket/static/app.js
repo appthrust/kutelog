@@ -66,6 +66,22 @@ let reconnectAttempt = 0;
 let lastReceivedTimestamp = 0;
 const INITIAL_RETRY_DELAY = 1000; // Start with 1 second delay
 
+// Connection status indicator
+function updateConnectionStatus(isConnected) {
+	const indicator = document.getElementById("conn-status-dot");
+	const label = document.getElementById("conn-status-label");
+	if (!indicator || !label) return;
+
+	if (isConnected) {
+		indicator.className =
+			"w-3 h-3 rounded-full bg-green-500 animate-pulse-slow";
+		label.textContent = "Connected";
+	} else {
+		indicator.className = "w-3 h-3 rounded-full bg-yellow-500";
+		label.textContent = "Connecting...";
+	}
+}
+
 const TIMESTAMP_STYLE = "color: #888";
 const LEVEL_STYLES = {
 	info: "color: #3b82f6",
@@ -127,6 +143,7 @@ function connect() {
 	ws.onopen = () => {
 		console.log("Connected to WebSocket server");
 		reconnectAttempt = 0;
+		updateConnectionStatus(true);
 	};
 
 	ws.onmessage = (event) => {
@@ -192,23 +209,25 @@ function connect() {
 	};
 
 	ws.onclose = () => {
-		console.log("WebSocket connection closed");
+		updateConnectionStatus(false);
 		reconnect();
 	};
 
-	ws.onerror = (error) => {
-		console.warn("WebSocket error:", error);
+	ws.onerror = () => {
+		updateConnectionStatus(false);
 	};
 }
 
 function reconnect() {
 	const retryDelay = INITIAL_RETRY_DELAY;
-	console.log(`Attempting to reconnect in ${retryDelay / 1000} seconds...`);
 	setTimeout(() => {
 		reconnectAttempt++;
 		connect();
 	}, retryDelay);
 }
+
+// Set initial connection status
+updateConnectionStatus(false);
 
 // Initial connection
 connect();
