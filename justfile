@@ -1,11 +1,11 @@
-# デフォルトのバージョン
+# Default version
 version := "dev"
 
-# バージョンを指定してビルド
+# Build with specified version
 build: clean
     go build -ldflags "-X github.com/appthrust/kutelog/pkg/version.Version={{version}}" -o dist/kutelog ./cmd/main.go
 
-# クロスビルド
+# Cross-platform build
 build-all: clean
     # Linux (amd64, arm64)
     GOOS=linux GOARCH=amd64 go build -ldflags "-X github.com/appthrust/kutelog/pkg/version.Version={{version}}" -o dist/kutelog-linux-amd64 ./cmd/main.go
@@ -16,11 +16,11 @@ build-all: clean
     # Windows (amd64)
     GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/appthrust/kutelog/pkg/version.Version={{version}}" -o dist/kutelog-windows-amd64.exe ./cmd/main.go
 
-# /usr/local/bin にインストール
+# Install to /usr/local/bin
 install: build
     sudo cp dist/kutelog /usr/local/bin/kutelog
 
-# distディレクトリをクリーンアップ
+# Clean up dist directory
 clean:
     rm -rf dist
     mkdir -p dist
