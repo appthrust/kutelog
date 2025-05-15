@@ -16,6 +16,10 @@ build-all: clean
     # Windows (amd64)
     GOOS=windows GOARCH=amd64 go build -ldflags "-X github.com/appthrust/kutelog/pkg/version.Version={{version}}" -o dist/kutelog-windows-amd64.exe ./cmd/main.go
 
+# /usr/local/bin にインストール
+install: build
+    sudo cp dist/kutelog /usr/local/bin/kutelog
+
 # distディレクトリをクリーンアップ
 clean:
     rm -rf dist
